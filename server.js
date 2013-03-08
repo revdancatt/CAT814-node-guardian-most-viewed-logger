@@ -114,7 +114,7 @@ http.createServer(function (request, response) {
         response.write('<html lang="en">');
         response.write('<head>');
         response.write('  <meta charset="utf-8" />');
-        response.write('  <title>Guardian Logger</title>');
+        response.write('  <title>Guardian Logger.</title>');
         response.write('</head>');
         response.write('<body>');
 
