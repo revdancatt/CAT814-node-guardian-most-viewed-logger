@@ -43,8 +43,8 @@ control = {
             "world":{"sectionName":"World news"}
         }
     },
-    fetchSectionsPicks: [],
     fetchSectionsViews: [],
+    fetchSectionsPicks: [],
 
     mdb: null,
     viewsCollection: null,
@@ -56,21 +56,21 @@ control = {
         this.guardian.key = key;
         this.count = 6;
 
-        //  Check to see if there are any items in the fetchSections array
-        //  if not then we need to populate it and then set a timer interval
-        //  to go off on either the hour, 20 minutes past or 40 minutes past
+        var msTillNextChunk = utils.msTillNextChunk();
+        console.log(('>> set next picks fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
+
         if (this.fetchSectionsViews.length === 0) {
-
             this.fetchSectionsViews = this.sections.keys.slice();
-            var msTillNextChunk = utils.msTillNextChunk();
-            console.log(('>> set next fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
-
-            setTimeout( function() {
-                control.fetchViews();
-                control.fetchPicks();
-            }, msTillNextChunk);
-
         }
+
+        if (this.fetchSectionsPicks.length === 0) {
+            this.fetchSectionsPicks = this.sections.keys.slice();
+        }
+
+        setTimeout( function() {
+            control.fetchViews();
+            control.fetchPicks();
+        }, msTillNextChunk);
 
     },
 
