@@ -70,7 +70,7 @@ control = {
         setTimeout( function() {
             control.fetchViews();
             control.fetchPicks();
-        }, msTillNextChunk);
+        }, msTillNextChunk + 1);
 
     },
 
@@ -92,7 +92,7 @@ control = {
 
             setTimeout( function() {
                 control.fetchViews();
-            }, msTillNextChunk);
+            }, msTillNextChunk + 1);
 
             return;
         }
@@ -162,7 +162,7 @@ control = {
 
             setTimeout( function() {
                 control.fetchPicks();
-            }, msTillNextChunk);
+            }, msTillNextChunk + 1);
 
             return;
         }
@@ -218,7 +218,15 @@ control = {
         //
         //  First thought figure out the current time so 
         var d = new Date();
-        var hourMins = d.getHours() + ':' + d.getMinutes();
+        var hourMins = d.getHours();
+        if (hourMins < 10) {
+            hourMins += '0';
+        }
+        if (d.getMinutes() < 10) {
+            hourMins += ':0' + d.getMinutes();
+        } else {
+            hourMins += ':' + d.getMinutes();
+        }
         var minsSinceMidnight = d.getHours() * 60 + d.getMinutes();
         var shortDate = null;
         var tagKeysFull = [];
@@ -265,7 +273,7 @@ control = {
                     console.log('>> Error when putting content into the viewsCollection database.'.error);
                     console.log(err);
                 } else {
-                    console.log(('>> view record added: ' + item.id).info);
+                    //console.log(('>> view record added: ' + item.id).info);
                 }
             });
         }
@@ -277,7 +285,7 @@ control = {
                     console.log('>> Error when putting content into the editorpicksCollection database.'.error);
                     console.log(err);
                 } else {
-                    console.log(('>> picks record added: ' + item.id).info);
+                    //console.log(('>> picks record added: ' + item.id).info);
                 }
             });
         }
