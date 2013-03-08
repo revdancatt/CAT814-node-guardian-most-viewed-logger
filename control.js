@@ -260,7 +260,7 @@ control = {
 
         if (where == 'views') {
             //  Pop this into the database, we don't really care what happens unless there's an error
-            this.viewsCollection.update({id: item.id}, item, {upsert: true, safe: true, keepGoing: true}, function(err, result) {
+            this.viewsCollection.insert(item, {safe: true, keepGoing: true}, function(err, result) {
                 if(err) {
                     console.log('>> Error when putting content into the viewsCollection database.'.error);
                     console.log(err);
@@ -272,7 +272,7 @@ control = {
 
         if (where == 'picks') {
             //  Pop this into the database, we don't really care what happens unless there's an error
-            this.editorpicksCollection.update({id: item.id}, item, {upsert: true, safe: true, keepGoing: true}, function(err, result) {
+            this.editorpicksCollection.insert(item, {safe: true, keepGoing: true}, function(err, result) {
                 if(err) {
                     console.log('>> Error when putting content into the editorpicksCollection database.'.error);
                     console.log(err);
