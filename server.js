@@ -99,6 +99,24 @@ http.createServer(function (request, response) {
     }
 
 
+    //  Force a fetch of most viewed
+    if (request.url === '/fetchMostViewed') {
+
+        //  For the moment go and fetch the latest articles here
+        //  this will normally be on an interval
+        control.fetchViews();
+
+        response.writeHead(200, {'Content-Type': 'text/html'});
+        response.write('Fetching most viewed<br />');
+        response.write('<p>');
+        response.write('<a href="/">Go Back</a>');
+        response.write('</p>');
+        response.end();
+        return;
+
+    }
+
+
     //  ########################################################################
     //
     //  THIS IS THE ONE WE REALLY CARE ABOUT, as it will...
