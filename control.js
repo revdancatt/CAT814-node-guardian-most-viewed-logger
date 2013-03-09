@@ -21,22 +21,26 @@ control = {
             "books":{"sectionName":"Books"},
             "business":{"sectionName":"Business"},
             "commentisfree":{"sectionName":"Comment is free"},
+
             "culture":{"sectionName":"Culture"},
             "education":{"sectionName":"Education"},
             "environment":{"sectionName":"Environment"},
             "fashion":{"sectionName":"Fashion"},
             "film":{"sectionName":"Film"},
+
             "football":{"sectionName":"Football"},
             "lifeandstyle":{"sectionName":"Life and style"},
             "media":{"sectionName":"Media"},
             "money":{"sectionName":"Money"},
             "music":{"sectionName":"Music"},
             "politics":{"sectionName":"Politics"},
+
             "science":{"sectionName":"Science"},
             "society":{"sectionName":"Society"},
             "sport":{"sectionName":"Sport"},
             "stage":{"sectionName":"Stage"},
             "technology":{"sectionName":"Technology"},
+
             "travel":{"sectionName":"Travel"},
             "tv-and-radio":{"sectionName":"Television &amp; radio"},
             "uk":{"sectionName":"UK news"},
@@ -87,7 +91,6 @@ control = {
             this.fetchSectionsViews = this.sections.keys.slice();
             var msTillNextChunk = utils.msTillNextChunk();
 
-            console.log('>> All view sections fetched'.info);
             console.log(('>> set next view fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
 
             setTimeout( function() {
@@ -121,7 +124,7 @@ control = {
                 if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'mostViewed' in json.response && json.response.mostViewed.length > 0) {
                     control.saveItems(json.response.mostViewed, section, 'views');
                 } else {
-                    console.log('>> Didn\'t find results in response'.warn);
+                    console.log(('>> Didn\'t find results in response for ' + section + ', views').warn);
                 }
 
                 //  Do this again in no time at all
@@ -157,7 +160,6 @@ control = {
             this.fetchSectionsPicks = this.sections.keys.slice();
             var msTillNextChunk = utils.msTillNextChunk();
 
-            console.log('>> All pick sections fetched'.info);
             console.log(('>> set next pick fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
 
             setTimeout( function() {
@@ -188,7 +190,7 @@ control = {
                 if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'editorsPicks' in json.response && json.response.editorsPicks.length > 0) {
                     control.saveItems(json.response.editorsPicks, section, 'picks');
                 } else {
-                    console.log('>> Didn\'t find results in response'.warn);
+                    console.log(('>> Didn\'t find results in response for ' + section + ', picks').warn);
                 }
 
                 setTimeout( function() {
