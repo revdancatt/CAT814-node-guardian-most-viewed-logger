@@ -24,35 +24,36 @@ if (!('GUARDIANAPI' in process.env)) {
     console.log('>> GUARDIANAPI=[your guardian api key]'.error);
     console.log('>> See: https://groups.google.com/forum/?fromgroups=#!topic/nodejs/1CnOzd352JE for more information'.error);
     process.exit(0);
-};
+}
 
 if (!('MONGOHQ_URL' in process.env)) {
     console.log('>> You need to set you MONGOHQ_URL connection thingy in your enviroment vars.'.error.bold);
     console.log('>> MONGOHQ_URL=[your mongodb connection thingy]'.error);
     console.log('>> See: https://groups.google.com/forum/?fromgroups=#!topic/nodejs/1CnOzd352JE for more information'.error);
     process.exit(0);
-};
+}
+
 //  ############################################################################
 
 //  We're not actually doing any of this at the moment
 var connectionUri = url.parse(process.env.MONGOHQ_URL);
 var dbName = connectionUri.pathname.replace(/^\//, '');
- 
+
 mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
- 
+
   if(err) {
- 
+
     console.log('Error opening database connection'.error);
     process.exit(0);
- 
+
   } else {
- 
+
     require('./control.js');
     control.init(process.env.GUARDIANAPI);
     console.log('Connected just fine'.info);
- 
+
     control.mdb = mdb;
- 
+
     mdb.collection('views', function(err, collection) {
       if (!err) {
         control.viewsCollection = collection;
@@ -61,7 +62,7 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
         process.exit(0);
       }
     });
- 
+
     mdb.collection('editorpicks', function(err, collection) {
       if (!err) {
         control.editorpicksCollection = collection;
@@ -70,9 +71,9 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
         process.exit(0);
       }
     });
- 
+
   }
- 
+
 });
 
 
@@ -132,7 +133,7 @@ http.createServer(function (request, response) {
         response.write('<html lang="en">');
         response.write('<head>');
         response.write('  <meta charset="utf-8" />');
-        response.write('  <title>Guardian Logger.</title>');
+        response.write('  <title>Guardian Logger</title>');
         response.write('</head>');
         response.write('<body>');
 
