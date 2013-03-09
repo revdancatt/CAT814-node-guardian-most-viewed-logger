@@ -48,7 +48,7 @@ control = {
 
     mdb: null,
     viewsCollection: null,
-    editorpicksCollection: null,
+    picksCollection: null,
 
     init: function(key) {
 
@@ -284,9 +284,9 @@ control = {
 
         if (where == 'picks') {
             //  Pop this into the database, we don't really care what happens unless there's an error
-            this.editorpicksCollection.insert(item, {safe: true, keepGoing: true}, function(err, result) {
+            this.picksCollection.insert(item, {safe: true, keepGoing: true}, function(err, result) {
                 if(err) {
-                    console.log('>> Error when putting content into the editorpicksCollection database.'.error);
+                    console.log('>> Error when putting content into the picksCollection database.'.error);
                     console.log(err);
                 } else {
                     //console.log(('>> picks record added: ' + item.id).info);

@@ -63,11 +63,11 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
       }
     });
 
-    mdb.collection('editorpicks', function(err, collection) {
+    mdb.collection('picks', function(err, collection) {
       if (!err) {
-        control.editorpicksCollection = collection;
+        control.picksCollection = collection;
       } else {
-        console.log('Error connecting to editorpicks collection'.error);
+        console.log('Error connecting to picks collection'.error);
         process.exit(0);
       }
     });
