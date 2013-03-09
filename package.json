@@ -1,10 +1,10 @@
 {
   "name": "CAT814-node-guardian-most-viewed-logger",
-  "subdomain": "revdancatt.CAT812-node-most-viewed-logger",
+  "subdomain": "revdancatt.CAT814-node-most-viewed-logger",
   "scripts": {
     "start": "./server.js"
   },
-  "version": "0.0.0",
+  "version": "0.0.0-9",
   "engines": {
     "node": "0.8.x"
   },

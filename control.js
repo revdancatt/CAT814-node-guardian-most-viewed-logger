@@ -252,7 +252,7 @@ control = {
             }
 
             //  Put the back into the item
-            item.position = i;
+            item.position = parseInt(i, 10);
             item.tagKeysFull = tagKeysFull;
             item.tagKeysShort = tagKeysShort;
             item.tagDict = tagDict;
