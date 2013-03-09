@@ -119,7 +119,7 @@ control = {
 
                 //  TODO: handle any of the below failing so we can just carry on
                 if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'mostViewed' in json.response && json.response.mostViewed.length > 0) {
-                    control.saveItems(json.response.mostViewed, 'views');
+                    control.saveItems(json.response.mostViewed, section, 'views');
                 } else {
                     console.log('>> Didn\'t find results in response'.warn);
                 }
@@ -186,7 +186,7 @@ control = {
 
                 var json = JSON.parse(output);
                 if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'editorsPicks' in json.response && json.response.editorsPicks.length > 0) {
-                    control.saveItems(json.response.editorsPicks, 'picks');
+                    control.saveItems(json.response.editorsPicks, section, 'picks');
                 } else {
                     console.log('>> Didn\'t find results in response'.warn);
                 }
@@ -211,7 +211,7 @@ control = {
 
     },
 
-    saveItems: function(json, where) {
+    saveItems: function(json, searchSection, where) {
 
         //  Loop over the results throwing each on at the database in the hope
         //  that they stick
@@ -253,6 +253,7 @@ control = {
 
             //  Put the back into the item
             item.position = parseInt(i, 10);
+            item.searchSection = searchSection;
             item.tagKeysFull = tagKeysFull;
             item.tagKeysShort = tagKeysShort;
             item.tagDict = tagDict;
