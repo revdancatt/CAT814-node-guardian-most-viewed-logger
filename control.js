@@ -220,7 +220,7 @@ control = {
         var d = new Date();
         var hourMins = d.getHours();
         if (hourMins < 10) {
-            hourMins += '0';
+            hourMins = '0' + hourMins;
         }
         if (d.getMinutes() < 10) {
             hourMins += ':0' + d.getMinutes();
@@ -234,10 +234,10 @@ control = {
         var tagsDict = {};
         var item = null;
 
-        //  Now get the first 10 items
+        //  Now get the first 5 items
         for (var i in json) {
 
-            if (i > 9) break;
+            if (i > 4) break;
             item = json[i];
 
             tagKeysFull = [];
@@ -248,7 +248,7 @@ control = {
             for (var t in item.tags) {
                 tagKeysFull.push(item.tags[t].id);
                 tagKeysShort.push(item.tags[t].id.split('/')[1]);
-                tagDict[item.tags[t].id.split('/')[1]] = item.tags[t].webTitle;
+                tagDict[item.tags[t].id] = item.tags[t].webTitle;
             }
 
             //  Put the back into the item
@@ -259,6 +259,9 @@ control = {
             item.hourMins = hourMins;
             item.minsSinceMidnight = minsSinceMidnight;
             item.shortDate = item.webPublicationDate.split('T')[0];
+
+            //  remove the tags node (to save space)
+            delete item.tags;
 
             this.pushItem(item, where);
 
