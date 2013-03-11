@@ -102,6 +102,16 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
       }
     });
 
+    //  REMOVE THIS, ONLY USING THIS FOR TESTING
+    /*
+    var dateObj = {
+        year: 2013,
+        month: 03,
+        day: 10
+    }
+    control.getDay(dateObj);
+    */
+
   }
 
 });
@@ -116,5 +126,6 @@ app.get('/pet/*', function(request, response) {
     console.log(request.params);
 });
 */
+
 
 http.createServer(app).listen(1337);

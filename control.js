@@ -57,6 +57,9 @@ control = {
     fetchViewsTmr: null,
     fetchPicksTmr: null,
 
+    dayScript: {},
+    currentMinute: 0,
+
     init: function(key) {
 
         //  set up all the things
@@ -220,7 +223,8 @@ control = {
         //  Loop over the results throwing each on at the database in the hope
         //  that they stick
         //
-        //  First thought figure out the current time so 
+        //  First thought figure out the current time so we can stamp the
+        //  record with the day/time
         var d = new Date();
         var hourMins = d.getHours();
         if (hourMins < 10) {
@@ -231,6 +235,19 @@ control = {
         } else {
             hourMins += ':' + d.getMinutes();
         }
+
+        var searchDate = (d.getYear() + 1900) + '-';
+        if (d.getMonth() + 1 < 10) {
+            searchDate += '0' + (d.getMonth() + 1) + '-';
+        } else {
+            searchDate += (d.getMonth() + 1) + '-';
+        }
+        if (d.getDate() < 10) {
+            searchDate += '0' + d.getDate();
+        } else {
+            searchDate += d.getDate();
+        }
+
         var minsSinceMidnight = d.getHours() * 60 + d.getMinutes();
         var shortDate = null;
         var tagKeysFull = [];
@@ -264,6 +281,7 @@ control = {
             item.hourMins = hourMins;
             item.minsSinceMidnight = minsSinceMidnight;
             item.shortDate = item.webPublicationDate.split('T')[0];
+            item.searchDate = searchDate;
 
             //  remove the tags node (to save space)
             delete item.tags;
@@ -303,11 +321,112 @@ control = {
     },
 
 
+    //  This kicks off everything we need for grabbing everything for a day
     getDay: function(date) {
 
+        if (date.month < 10) date.month = '0' + date.month;
+        if (date.day < 10) date.day = '0' + date.day;
         var shortDate = date.year + '-' + date.month + '-' + date.day;
-        console.log('>> In getDay()'.info);
-        console.log(('>> shortDate:' + shortDate).info);
+
+        //  we want to start the whole day from scratch so lets clear out the day
+        this.dayScript = {};
+        this.currentMinute = 0;
+
+        this.getMinute(shortDate);
+
+    },
+
+    getMinute: function(shortDate) {
+
+        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+        console.log(('>> currentMinute = ' + control.currentMinute).info);
+        //console.log('---------------------------------'.rainbow);
+
+        //  create the empty info we need for this minute of the day
+
+        //  if the current Minute is 0, then we are at the start of the day
+        //  otherwise we need to copy over the record from the last minute
+        this.dayScript[this.currentMinute] = {
+            tags: {},
+            otherSectionsKey: [],
+            otherSectionsDict: {}
+        };
+        var newAge = null;
+        var newScore = null;
+
+        if (this.currentMinute !== 0) {
+            for (var t in this.dayScript[this.currentMinute - 1].tags) {
+                newAge = ++this.dayScript[this.currentMinute - 1].tags[t].age;
+                newScore = this.dayScript[this.currentMinute - 1].tags[t].score;
+
+                //  If we are over 20 mins then start to decay the values
+                if (newAge > 20) {
+                    newScore = newScore * 0.99;
+                }
+                //  Only add it back in if it's above a useful threshold,
+                //  this will make them vanish off
+                if (newScore > 0.5) {
+                    this.dayScript[this.currentMinute].tags[t] = {
+                        score: newScore,
+                        age: newAge
+                    };
+                }
+            }
+        }
+
+        //  This goes and gets the 1st set of "global" most viewed for the date
+        control.viewsCollection.find({shortDate: shortDate, searchSection: '/', minsSinceMidnight: control.currentMinute}).toArray(function(err, views) {
+
+            //  Now that we have them we are going to do two things
+            //  throw the sections into an array so we can go and fetch those too
+            var thisView = null;
+            var thisTag = null;
+            for (var i in views) {
+
+                thisView = views[i];
+
+                //  Build up the other sections array
+                if (!(thisView.sectionId in control.dayScript[control.currentMinute].otherSectionsDict)) {
+                    control.dayScript[control.currentMinute].otherSectionsDict[thisView.sectionId] = true;
+                    control.dayScript[control.currentMinute].otherSectionsKey.push(thisView.sectionId);
+                    //console.log(('>> Found section: ' + thisView.sectionId).info);
+                }
+
+                //  And also go thru the tags
+                for (var t in thisView.tagKeysFull) {
+                    thisTag = thisView.tagKeysFull[t];
+
+                    //  Now we want to reject any tags where the first hald
+                    //  and second half are the same
+                    if (thisTag.split('/')[0] != thisTag.split('/')[1]) {
+
+                        //  If we already have this tag then we need 
+                        if (thisTag in control.dayScript[control.currentMinute].tags) {
+                            control.dayScript[control.currentMinute].tags[thisTag].score = control.dayScript[control.currentMinute].tags[thisTag].score * 1.1;
+                            control.dayScript[control.currentMinute].tags[thisTag].age = 1; // <<< - reset the age as we have just spotted it
+                        } else {
+                            //console.log(('>> new tag!! ' + thisTag).error);
+                            control.dayScript[control.currentMinute].tags[thisTag] = {
+                                score: 1,
+                                age: 1
+                            };
+                        }
+                    }
+                }
+
+            }
+
+            console.log(control.dayScript[control.currentMinute]);
+            control.currentMinute++;
+
+            if (control.currentMinute < 1440) {
+                setTimeout(function() {
+                    control.getMinute(shortDate);
+                });
+            }
+
+
+        });
 
     }
 
