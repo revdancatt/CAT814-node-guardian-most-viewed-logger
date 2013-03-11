@@ -1,7 +1,10 @@
-//  pull in all the stuff we need
+var express = require('express');
 var mongodb = require('mongodb');
 var colours = require('colors');
+var exphbs  = require('express3-handlebars');
+var routes  = require('./routes');
 var http = require('http');
+var path = require('path');
 var url  = require('url');
 
 console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
@@ -12,9 +15,36 @@ colours.setTheme({
   help: 'cyan',
   warn: 'yellow',
   debug: 'blue',
-  error: 'red',
-  haiku: 'magenta'
+  error: 'red'
 });
+
+
+var app = express();
+var hbs = exphbs.create({
+    extname: ".html"
+});
+
+app.configure(function(){
+    app.engine('html', hbs.engine);
+    app.set('view engine', 'html');
+    app.set('views', __dirname + '/templates');
+    app.use(express.static(__dirname + '/public'));
+    app.use(express.favicon(__dirname + '/public/img/favicon.ico'));
+    app.use(express.logger('dev'));
+    app.use(express.bodyParser());
+    app.use(express.methodOverride());
+    app.use(app.router);
+    app.use(function(request, response, next) {
+        throw new Error(request.url + ' not found');
+    });
+    /*
+    app.use(function(err, request, response, next) {
+        console.log(('>> ' + err).error);
+        response.send(err.message);
+    });
+    */
+});
+
 
 //  ############################################################################
 //  Check to see if the guardian API key exists in the enviroment vars
@@ -77,77 +107,14 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
 });
 
 
-//  Now that we have safely got here we can carry on as though nothing is wrong
+app.get('/', routes.index);
+app.get('/fetchMostViewed', routes.fetchMostViewed);
+app.get('/getDay/:year/:month/:day?', routes.getDay);
 
-//  ############################################################################
-//  
-//  Server stuff
-//
-//  ############################################################################
+/*
+app.get('/pet/*', function(request, response) {
+    console.log(request.params);
+});
+*/
 
-http.createServer(function (request, response) {
-
-
-    //  ########################################################################
-    //
-    //  tell the favicon to sod off
-    //
-    //  ########################################################################
-    if (request.url === '/favicon.ico') {
-        response.writeHead(200, {'Content-Type': 'image/x-icon'} );
-        response.end();
-        return;
-    }
-
-
-    //  Force a fetch of most viewed
-    if (request.url === '/fetchMostViewed') {
-
-        //  For the moment go and fetch the latest articles here
-        //  this will normally be on an interval
-        control.fetchViews();
-
-        response.writeHead(200, {'Content-Type': 'text/html'});
-        response.write('Fetching most viewed<br />');
-        response.write('<p>');
-        response.write('<a href="/">Go Back</a>');
-        response.write('</p>');
-        response.end();
-        return;
-
-    }
-
-
-    //  ########################################################################
-    //
-    //  THIS IS THE ONE WE REALLY CARE ABOUT, as it will...
-    //  Let the user know the current status of the server.
-    //
-    //  ########################################################################
-    request.on('end', function () {
-
-        control.count++;
-
-        response.writeHead(200, {'Content-Type': 'text/html'});
-        response.write('<!DOCTYPE html>');
-        response.write('<html lang="en">');
-        response.write('<head>');
-        response.write('  <meta charset="utf-8" />');
-        response.write('  <title>Guardian Logger.</title>');
-        response.write('</head>');
-        response.write('<body>');
-
-        response.write('Counter : ' + control.count.toString() + '<br />');
-
-        response.write('</body>');
-        response.write('</html>');
-
-        response.end();
-
-    });
-
-}).listen(1337);
-
-
-console.log('Server running at http://127.0.0.1:1337/'.info);
-console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+http.createServer(app).listen(1337);

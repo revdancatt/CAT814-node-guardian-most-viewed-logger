@@ -300,6 +300,15 @@ control = {
         }
 
 
+    },
+
+
+    getDay: function(date) {
+
+        var shortDate = date.year + '-' + date.month + '-' + date.day;
+        console.log('>> In getDay()'.info);
+        console.log(('>> shortDate:' + shortDate).info);
+
     }
 
 };
