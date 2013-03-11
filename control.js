@@ -365,7 +365,7 @@ control = {
                 }
                 //  Only add it back in if it's above a useful threshold,
                 //  this will make them vanish off
-                if (newScore > 0.5) {
+                if (newScore >= 1) {
                     this.dayScript[this.currentMinute].tags[t] = {
                         score: newScore,
                         age: newAge
@@ -407,7 +407,7 @@ control = {
                         } else {
                             //console.log(('>> new tag!! ' + thisTag).error);
                             control.dayScript[control.currentMinute].tags[thisTag] = {
-                                score: 1,
+                                score: 1.5 - ((thisView.position+1) / 10),
                                 age: 1
                             };
                         }
