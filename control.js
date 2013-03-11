@@ -54,6 +54,9 @@ control = {
     viewsCollection: null,
     picksCollection: null,
 
+    fetchViewsTmr: null,
+    fetchPicksTmr: null,
+
     init: function(key) {
 
         //  set up all the things
@@ -71,10 +74,11 @@ control = {
             this.fetchSectionsPicks = this.sections.keys.slice();
         }
 
-        setTimeout( function() {
-            control.fetchViews();
-            control.fetchPicks();
-        }, msTillNextChunk + 1);
+        clearTimeout(control.fetchViewsTmr);
+        clearTimeout(control.fetchPicksTmr);
+
+        control.fetchViewsTmr = setTimeout( function() { control.fetchViews(); }, msTillNextChunk + 1);
+        control.fetchPicksTmr = setTimeout( function() { control.fetchPicks(); }, msTillNextChunk + 1);
 
     },
 
@@ -93,9 +97,8 @@ control = {
 
             console.log(('>> set next view fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
 
-            setTimeout( function() {
-                control.fetchViews();
-            }, msTillNextChunk + 1);
+            clearTimeout(control.fetchViewsTmr);
+            control.fetchViewsTmr = setTimeout( function() { control.fetchViews(); }, msTillNextChunk + 1);
 
             return;
         }
@@ -162,9 +165,8 @@ control = {
 
             console.log(('>> set next pick fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
 
-            setTimeout( function() {
-                control.fetchPicks();
-            }, msTillNextChunk + 1);
+            clearTimeout(control.fetchPicksTmr);
+            control.fetchPicksTmr = setTimeout( function() { control.fetchPicks(); }, msTillNextChunk + 1);
 
             return;
         }
