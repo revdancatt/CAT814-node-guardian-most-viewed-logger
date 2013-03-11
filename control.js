@@ -320,3 +320,6 @@ utils = {
 
     }
 };
+
+//  How to find results in a section, in a time range...
+//  db.views.find( {shortDate: '2013-03-10', searchSection: '/', minsSinceMidnight: {"$gte": 219, "$lte": 221}}, {id: true, searchSection: true, minsSinceMidnight: true, position: true} ).sort({position: 1})
