@@ -33,14 +33,14 @@ control = {
             "media":{"sectionName":"Media"},
             "money":{"sectionName":"Money"},
             "music":{"sectionName":"Music"},
-            "politics":{"sectionName":"Politics"},
 
+            "politics":{"sectionName":"Politics"},
             "science":{"sectionName":"Science"},
             "society":{"sectionName":"Society"},
             "sport":{"sectionName":"Sport"},
             "stage":{"sectionName":"Stage"},
-            "technology":{"sectionName":"Technology"},
 
+            "technology":{"sectionName":"Technology"},
             "travel":{"sectionName":"Travel"},
             "tv-and-radio":{"sectionName":"Television &amp; radio"},
             "uk":{"sectionName":"UK news"},
@@ -53,6 +53,7 @@ control = {
     mdb: null,
     viewsCollection: null,
     picksCollection: null,
+    scriptCollection: null,
 
     fetchViewsTmr: null,
     fetchPicksTmr: null,
@@ -317,7 +318,6 @@ control = {
             });
         }
 
-
     },
 
 
@@ -326,107 +326,209 @@ control = {
 
         if (date.month < 10) date.month = '0' + date.month;
         if (date.day < 10) date.day = '0' + date.day;
-        var shortDate = date.year + '-' + date.month + '-' + date.day;
+        var searchDate = date.year + '-' + date.month + '-' + date.day;
 
         //  we want to start the whole day from scratch so lets clear out the day
         this.dayScript = {};
         this.currentMinute = 0;
 
-        this.getMinute(shortDate);
+        console.log(('>> searchDate: ' + searchDate).info);
+
+        //  TODO:
+        //  Don't blow away the whole table *just* the one for the
+        //  day we are populating
+        this.scriptCollection.drop(function() {
+            console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+            console.log('>> START'.info);
+            control.getMinute(searchDate, '/', 'views');
+        });
 
     },
 
-    getMinute: function(shortDate) {
 
-        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
-        console.log(('>> currentMinute = ' + control.currentMinute).info);
-        //console.log('---------------------------------'.rainbow);
+    // #######################################################################
+    // #######################################################################
+    // #######################################################################
+    //
+    //  TODO:
+    //  
+    //  Instead of updating this on demand for the whole date we need
+    //  to call this once a minute to update the script through the day.
+    //  This is so we can have an upto minute version of the data
+    //  and plot a graph and what-not accordingly to "track tags"
+    //  over time and show what the news is.
+    //
+    //  We need to do this once a minute for the *previous* minute, so our
+    //  data will lag by one minute, but that's not really a huge problem
+    //
+    //  We we also be polling the Guardian API once per 5 mins to spot the
+    //  launch of new stories, but that's handled in a different thread. But
+    //  to make sure we don't skip anything we should ignore stories published
+    //  within the current minute (we can always check for them again next time)
+    //
+    //  Also, we need to make sure we don't hit the rate limmit of 5,000 calls
+    //  per day.
+    //
+    //  currently:
+    //  2 calls per section (one for picks one for views)
+    //  2 * 25 = 50 calls, once every 20mins
+    //  50 * 3 * 24 = 3,600 calls.
+    //
+    //  Which leaves us with 1,400 left for the API. Which is once per minute
+    //  excluding the last 40 mins. I think we can get away with once every
+    //  20mins.
+    //  
+    // #######################################################################
+    // #######################################################################
+    // #######################################################################
+
+    getMinute: function(searchDate, searchSection, mode) {
 
         //  create the empty info we need for this minute of the day
+        //  if it doesn't already exist
+        if (!(this.currentMinute in this.dayScript)) {
+            this.dayScript[this.currentMinute] = {
+                tags: {},
+                otherSectionsKey: [],
+                otherSectionsDict: {}
+            };
+            var newAge = null;
+            var newScore = null;
 
-        //  if the current Minute is 0, then we are at the start of the day
-        //  otherwise we need to copy over the record from the last minute
-        this.dayScript[this.currentMinute] = {
-            tags: {},
-            otherSectionsKey: [],
-            otherSectionsDict: {}
-        };
-        var newAge = null;
-        var newScore = null;
+            //  If it's any minute other than the first we need to
+            //  copy over all the information from the previous day
+            if (this.currentMinute !== 0) {
+                for (var t in this.dayScript[this.currentMinute - 1].tags) {
+                    newAge = ++this.dayScript[this.currentMinute - 1].tags[t].age;
+                    newScore = this.dayScript[this.currentMinute - 1].tags[t].score;
 
-        if (this.currentMinute !== 0) {
-            for (var t in this.dayScript[this.currentMinute - 1].tags) {
-                newAge = ++this.dayScript[this.currentMinute - 1].tags[t].age;
-                newScore = this.dayScript[this.currentMinute - 1].tags[t].score;
-
-                //  If we are over 20 mins then start to decay the values
-                if (newAge > 20) {
-                    newScore = newScore * 0.99;
-                }
-                //  Only add it back in if it's above a useful threshold,
-                //  this will make them vanish off
-                if (newScore >= 1) {
-                    this.dayScript[this.currentMinute].tags[t] = {
-                        score: newScore,
-                        age: newAge
-                    };
+                    //  If we are over 20 mins then start to decay the values
+                    if (newAge > 20) {
+                        newScore = newScore * 0.99;
+                    }
+                    //  Only add it back in if it's above a useful threshold,
+                    //  this will make them vanish off
+                    if (newScore >= 1) {
+                        this.dayScript[this.currentMinute].tags[t] = {
+                            score: newScore,
+                            age: newAge
+                        };
+                    }
                 }
             }
         }
 
+        //  use either the picks or views database
+        var dbToUse = control.picksCollection;
+        if (mode == 'views') {
+            dbToUse = control.viewsCollection;
+        }
+
         //  This goes and gets the 1st set of "global" most viewed for the date
-        control.viewsCollection.find({shortDate: shortDate, searchSection: '/', minsSinceMidnight: control.currentMinute}).toArray(function(err, views) {
+        dbToUse.find({searchDate: searchDate, searchSection: searchSection, minsSinceMidnight: control.currentMinute}).toArray(function(err, views) {
 
-            //  Now that we have them we are going to do two things
-            //  throw the sections into an array so we can go and fetch those too
-            var thisView = null;
-            var thisTag = null;
-            for (var i in views) {
 
-                thisView = views[i];
+            //  Go store the views and what have you
+            control.storeViews(views);
 
-                //  Build up the other sections array
-                if (!(thisView.sectionId in control.dayScript[control.currentMinute].otherSectionsDict)) {
-                    control.dayScript[control.currentMinute].otherSectionsDict[thisView.sectionId] = true;
-                    control.dayScript[control.currentMinute].otherSectionsKey.push(thisView.sectionId);
-                    //console.log(('>> Found section: ' + thisView.sectionId).info);
+            //  Throw the data into the database
+            var scriptNode = {
+                searchDate: searchDate,
+                minute: control.currentMinute,
+                script: control.dayScript[control.currentMinute]
+            };
+            control.scriptCollection.update({searchDate: searchDate, minute: control.currentMinute}, scriptNode, {upsert: true, safe: true, keepGoing: true}, function(err, result) {
+                if(err) {
+                    console.log('>> Error when putting content into the scriptCollection database.'.error);
+                    console.log(err);
                 }
+            });
 
-                //  And also go thru the tags
-                for (var t in thisView.tagKeysFull) {
-                    thisTag = thisView.tagKeysFull[t];
 
-                    //  Now we want to reject any tags where the first hald
-                    //  and second half are the same
-                    if (thisTag.split('/')[0] != thisTag.split('/')[1]) {
-
-                        //  If we already have this tag then we need 
-                        if (thisTag in control.dayScript[control.currentMinute].tags) {
-                            control.dayScript[control.currentMinute].tags[thisTag].score = control.dayScript[control.currentMinute].tags[thisTag].score * 1.1;
-                            control.dayScript[control.currentMinute].tags[thisTag].age = 1; // <<< - reset the age as we have just spotted it
-                        } else {
-                            //console.log(('>> new tag!! ' + thisTag).error);
-                            control.dayScript[control.currentMinute].tags[thisTag] = {
-                                score: 1.5 - ((thisView.position+1) / 10),
-                                age: 1
-                            };
-                        }
-                    }
-                }
-
+            if (control.currentMinute >= 1439) {
+                console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+                console.log(('>> currentMinute = ' + control.currentMinute).info);
+                console.log(control.dayScript[control.currentMinute]);
             }
 
-            console.log(control.dayScript[control.currentMinute]);
-            control.currentMinute++;
-
-            if (control.currentMinute < 1440) {
+            //  if there are any sections left then we need to process them...
+            if (control.dayScript[control.currentMinute].otherSectionsKey.length > 0) {
+                var newSearchSection = control.dayScript[control.currentMinute].otherSectionsKey.pop();
                 setTimeout(function() {
-                    control.getMinute(shortDate);
+                    control.getMinute(searchDate, newSearchSection, mode);
                 });
+            } else {
+
+                //  otherwise bump the minute and start all over again
+                control.currentMinute++;
+
+                if (control.currentMinute < 1440) {
+                    setTimeout(function() {
+                        control.getMinute(searchDate, '/', mode);
+                    });
+                } else {
+
+                    //  If we have just finished the "views" mode we need
+                    //  to do the whole thing again but with picks
+                    if (mode == 'views') {
+                        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+                        console.log('>> moving onto picks'.alert.bold);
+                        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+                        control.currentMinute = 0;
+                        setTimeout(function() {
+                            control.getMinute(searchDate, '/', 'picks');
+                        });
+                    } else {
+                        console.log('>> FINISHED'.info);
+                        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+                    }
+                }
             }
 
 
         });
+
+    },
+
+    storeViews: function(views) {
+
+        //  Now that we have them we are going to do two things
+        //  throw the sections into an array so we can go and fetch those too
+        var thisView = null;
+        var thisTag = null;
+        for (var i in views) {
+
+            thisView = views[i];
+
+            //  Build up the other sections array
+            if (!(thisView.sectionId in control.dayScript[control.currentMinute].otherSectionsDict)) {
+                control.dayScript[control.currentMinute].otherSectionsDict[thisView.sectionId] = true;
+                control.dayScript[control.currentMinute].otherSectionsKey.push(thisView.sectionId);
+                //console.log(('>> Found section: ' + thisView.sectionId).info);
+            }
+
+            //  And also go thru the tags
+            for (var t in thisView.tagKeysFull) {
+                thisTag = thisView.tagKeysFull[t];
+
+                //  Now we want to reject any tags where the first hald
+                //  and second half are the same
+                if (thisTag.split('/')[0] != thisTag.split('/')[1]) {
+
+                    //  If we already have this tag then we need 
+                    if (thisTag in control.dayScript[control.currentMinute].tags) {
+                        control.dayScript[control.currentMinute].tags[thisTag].score = control.dayScript[control.currentMinute].tags[thisTag].score * 1.01;
+                        control.dayScript[control.currentMinute].tags[thisTag].age = 1; // <<< - reset the age as we have just spotted it
+                    } else {
+                        control.dayScript[control.currentMinute].tags[thisTag] = {
+                            score: 1.6 - ((thisView.position+1) / 10),
+                            age: 1
+                        };
+                    }
+                }
+            }
+
+        }
 
     }
 

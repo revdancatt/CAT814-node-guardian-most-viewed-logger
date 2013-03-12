@@ -15,7 +15,8 @@ colours.setTheme({
   help: 'cyan',
   warn: 'yellow',
   debug: 'blue',
-  error: 'red'
+  error: 'red',
+  alert: 'magenta'
 });
 
 
@@ -102,15 +103,22 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
       }
     });
 
+    mdb.collection('script', function(err, collection) {
+      if (!err) {
+        control.scriptCollection = collection;
+      } else {
+        console.log('Error connecting to script collection'.error);
+        process.exit(0);
+      }
+    });
+
     //  REMOVE THIS, ONLY USING THIS FOR TESTING
-    /*
     var dateObj = {
         year: 2013,
         month: 03,
-        day: 10
-    }
-    control.getDay(dateObj);
-    */
+        day: 11
+    };
+    //control.getDay(dateObj);
 
   }
 
