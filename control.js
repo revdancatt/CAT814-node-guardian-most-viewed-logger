@@ -69,6 +69,10 @@ control = {
         this.guardian.key = key;
         this.count = 6;
 
+    },
+
+    startTimers: function() {
+
         var msTillNextChunk = utils.msTillNextChunk();
         console.log(('>> set next picks fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
 

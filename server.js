@@ -115,7 +115,7 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
       }
     });
 
-    //control.startGetMinute();
+    control.startTimers();
 
   }
 
