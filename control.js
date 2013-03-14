@@ -57,11 +57,13 @@ control = {
 
     fetchViewsTmr: null,
     fetchPicksTmr: null,
+    makeScriptTmr: null,
 
     dayScript: {},
     currentMinute: 0,
 
     init: function(key) {
+
 
         //  set up all the things
         this.guardian.key = key;
@@ -83,6 +85,22 @@ control = {
 
         control.fetchViewsTmr = setTimeout( function() { control.fetchViews(); }, msTillNextChunk + 1);
         control.fetchPicksTmr = setTimeout( function() { control.fetchPicks(); }, msTillNextChunk + 1);
+
+        //  Set up the makeScriptTmr to start half way through the next minute
+        var d = new Date();
+        var e = new Date(d);
+        var msSinceMidnight = e - d.setHours(0,0,0,0);
+        var minsSinceMidnight = Math.floor(msSinceMidnight / (60 * 1000));
+        var futureMs = ((minsSinceMidnight * 60 * 1000) + (90 * 1000)) - msSinceMidnight;
+        console.log(('>> setting makeScriptTmr in ' + futureMs / 1000 + 's').info);
+        setTimeout(function() {
+            clearInterval(control.makeScriptTmr);
+            console.log(('>> starting makeScriptTmr interval timer').info);
+            control.makeScriptTmr = setInterval(function() {
+                control.startGetMinute();
+            }, 1000 * 60);
+            control.startGetMinute();
+        }, futureMs);
 
     },
 
@@ -321,16 +339,41 @@ control = {
     },
 
 
-    //  This kicks off everything we need for grabbing everything for a day
-    getDay: function(date) {
 
-        if (date.month < 10) date.month = '0' + date.month;
-        if (date.day < 10) date.day = '0' + date.day;
-        var searchDate = date.year + '-' + date.month + '-' + date.day;
+
+
+
+
+
+    //  ####################################################################################
+    //  ####################################################################################
+    //  ####################################################################################
+    //
+    //  Below is all about saving the script
+    //
+    //  ####################################################################################
+    //  ####################################################################################
+    //  ####################################################################################
+
+
+
+
+
+
+
+
+
+
+    //  This kicks off everything we need for grabbing everything for a day
+    getDay: function(dateObj) {
+
+        if (dateObj.month < 10) dateObj.month = '0' + dateObj.month;
+        if (dateObj.day < 10) dateObj.day = '0' + dateObj.day;
+        var searchDate = dateObj.year + '-' + dateObj.month + '-' + dateObj.day;
 
         //  we want to start the whole day from scratch so lets clear out the day
-        this.dayScript = {};
-        this.currentMinute = 0;
+        //this.dayScript = {};
+        //this.currentMinute = 0;
 
         console.log(('>> searchDate: ' + searchDate).info);
 
@@ -340,83 +383,95 @@ control = {
         this.scriptCollection.drop(function() {
             console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
             console.log('>> START'.info);
-            control.getMinute(searchDate, '/', 'views');
+            control.getMinute(searchDate, '/', 0, [], {}, 'views', true);
         });
 
     },
 
 
-    // #######################################################################
-    // #######################################################################
-    // #######################################################################
-    //
-    //  TODO:
-    //  
-    //  Instead of updating this on demand for the whole date we need
-    //  to call this once a minute to update the script through the day.
-    //  This is so we can have an upto minute version of the data
-    //  and plot a graph and what-not accordingly to "track tags"
-    //  over time and show what the news is.
-    //
-    //  We need to do this once a minute for the *previous* minute, so our
-    //  data will lag by one minute, but that's not really a huge problem
-    //
-    //  We we also be polling the Guardian API once per 5 mins to spot the
-    //  launch of new stories, but that's handled in a different thread. But
-    //  to make sure we don't skip anything we should ignore stories published
-    //  within the current minute (we can always check for them again next time)
-    //
-    //  Also, we need to make sure we don't hit the rate limmit of 5,000 calls
-    //  per day.
-    //
-    //  currently:
-    //  2 calls per section (one for picks one for views)
-    //  2 * 25 = 50 calls, once every 20mins
-    //  50 * 3 * 24 = 3,600 calls.
-    //
-    //  Which leaves us with 1,400 left for the API. Which is once per minute
-    //  excluding the last 40 mins. I think we can get away with once every
-    //  20mins.
-    //  
-    // #######################################################################
-    // #######################################################################
-    // #######################################################################
+    //  This starts the process of getting the data for a minute
+    startGetMinute: function() {
 
-    getMinute: function(searchDate, searchSection, mode) {
+        //  Get the time one minute ago
+        var d = new Date(new Date()-60000);
+        var dateObj = {
+            year: d.getYear() + 1900,
+            month: d.getMonth() + 1,
+            day: d.getDate(),
+            lastMinute: d.getHours() * 60 + d.getMinutes()
+        };
 
-        //  create the empty info we need for this minute of the day
-        //  if it doesn't already exist
-        if (!(this.currentMinute in this.dayScript)) {
-            this.dayScript[this.currentMinute] = {
-                tags: {},
-                otherSectionsKey: [],
-                otherSectionsDict: {}
+        if (dateObj.month < 10) dateObj.month = '0' + dateObj.month;
+        if (dateObj.day < 10) dateObj.day = '0' + dateObj.day;
+        var searchDate = dateObj.year + '-' + dateObj.month + '-' + dateObj.day;
+
+        control.getMinute(searchDate, '/', dateObj.lastMinute, [], {}, 'views', false);
+
+    },
+
+
+    //  Do the calculations to record the "hotness" of tags
+    getMinute: function(searchDate, searchSection, searchMinute, otherSectionsKey, otherSectionsDict, mode, backfill) {
+
+
+
+        //  Check to see if we have a dayscript for this day already
+        control.scriptCollection.find({searchDate: searchDate, searchMinute: searchMinute}).toArray(function(err, records) {
+
+            var dayScript = {
+                tags: {}
             };
-            var newAge = null;
-            var newScore = null;
 
-            //  If it's any minute other than the first we need to
-            //  copy over all the information from the previous day
-            if (this.currentMinute !== 0) {
-                for (var t in this.dayScript[this.currentMinute - 1].tags) {
-                    newAge = ++this.dayScript[this.currentMinute - 1].tags[t].age;
-                    newScore = this.dayScript[this.currentMinute - 1].tags[t].score;
+            //  if we don't have one then we need to look for a previous
+            //  record that we can crib from
+            if(err || records.length === 0) {
 
-                    //  If we are over 20 mins then start to decay the values
-                    if (newAge > 20) {
-                        newScore = newScore * 0.99;
+                control.scriptCollection.find({searchDate: searchDate, searchMinute: {"$lt": searchMinute}}).sort({searchMinute: -1}).limit(1).toArray(function(err, records) {
+                    if(err || records.length === 0) {
+                        control.getMinuteCont(searchDate, searchSection, searchMinute, otherSectionsKey, otherSectionsDict, dayScript, mode, backfill);
+                    } else {
+
+                        var newAge = null;
+                        var newScore = null;
+                        var record = records[0];
+
+                        for (var t in record.script.tags) {
+                            newAge = ++record.script.tags[t].age;
+                            newScore = record.script.tags[t].score;
+
+                            //  If we are over 20 mins then start to decay the values
+                            if (newAge > 20) {
+                                newScore = newScore * 0.99;
+                            }
+                            //  Only add it back in if it's above a useful threshold,
+                            //  this will make them vanish off
+                            if (newScore >= 1) {
+                                dayScript.tags[t] = {
+                                    score: newScore,
+                                    age: newAge
+                                };
+                            }
+                        }
+                        control.getMinuteCont(searchDate, searchSection, searchMinute, otherSectionsKey, otherSectionsDict, dayScript, mode, backfill);
+
                     }
-                    //  Only add it back in if it's above a useful threshold,
-                    //  this will make them vanish off
-                    if (newScore >= 1) {
-                        this.dayScript[this.currentMinute].tags[t] = {
-                            score: newScore,
-                            age: newAge
-                        };
-                    }
-                }
+                });
+
+            } else {
+
+                //  Otherwise we can use it
+                dayScript.tags = records[0].script.tags;
+                control.getMinuteCont(searchDate, searchSection, searchMinute, otherSectionsKey, otherSectionsDict, dayScript, mode, backfill);
+
             }
-        }
+
+
+        });
+
+    },
+
+    getMinuteCont: function(searchDate, searchSection, searchMinute, otherSectionsKey, otherSectionsDict, dayScript, mode, backfill) {
+
 
         //  use either the picks or views database
         var dbToUse = control.picksCollection;
@@ -424,86 +479,94 @@ control = {
             dbToUse = control.viewsCollection;
         }
 
+
         //  This goes and gets the 1st set of "global" most viewed for the date
-        dbToUse.find({searchDate: searchDate, searchSection: searchSection, minsSinceMidnight: control.currentMinute}).toArray(function(err, views) {
+        dbToUse.find({searchDate: searchDate, searchSection: searchSection, minsSinceMidnight: searchMinute}).toArray(function(err, views) {
 
-
-            //  Go store the views and what have you
-            control.storeViews(views);
+            //  Go store the views and what have you and get back
+            //  a new list of section keys
+            var sectionsObj = control.storeViews(views, searchMinute, otherSectionsKey, otherSectionsDict, dayScript);
+            otherSectionsKey = sectionsObj.otherSectionsKey;
+            otherSectionsDict = sectionsObj.otherSectionsDict;
+            dayScript = sectionsObj.dayScript;
 
             //  Throw the data into the database
             var scriptNode = {
                 searchDate: searchDate,
-                minute: control.currentMinute,
-                script: control.dayScript[control.currentMinute]
+                searchMinute: searchMinute,
+                script: dayScript
             };
-            control.scriptCollection.update({searchDate: searchDate, minute: control.currentMinute}, scriptNode, {upsert: true, safe: true, keepGoing: true}, function(err, result) {
+
+            control.scriptCollection.update({searchDate: searchDate, searchMinute: searchMinute}, scriptNode, {upsert: true, safe: true, keepGoing: true}, function(err, result) {
                 if(err) {
                     console.log('>> Error when putting content into the scriptCollection database.'.error);
                     console.log(err);
                 }
+
+                //  if there are any sections left then we need to process them...
+                if (otherSectionsKey.length > 0) {
+                    var newSearchSection = otherSectionsKey.pop();
+                    setTimeout(function() {
+                        control.getMinute(searchDate, newSearchSection, searchMinute, otherSectionsKey, otherSectionsDict, mode, backfill);
+                    }, 10);
+                } else {
+
+                    //  Write the dayscript to the db
+
+                    //  TODO
+                    //  MAKE THIS WORK IF WE ARE BACKFILLING!
+
+                    //searchMinute++;
+
+                    //if (searchMinute < 1440) {
+                    //    setTimeout(function() {
+                    //        control.getMinute(searchDate, '/', searchMinute, otherSectionsKey, mode, backfill);
+                    //    });
+                    //} else {
+
+                    //    //  If we have just finished the "views" mode we need
+                    //    //  to do the whole thing again but with picks
+                    //    if (mode == 'views') {
+                    //        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+                    //        console.log('>> moving onto picks'.alert.bold);
+                    //        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+                    //        searchMinute = 0;
+                    //        setTimeout(function() {
+                    //            control.getMinute(searchDate, '/', searchMinute, otherSectionsKey, 'picks', backfill);
+                    //        });
+                    //    } else {
+                    //        console.log('>> FINISHED'.info);
+                    //        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
+                    //    }
+                    //}
+                    //
+
+                }
+
             });
 
 
-            if (control.currentMinute >= 1439) {
-                console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
-                console.log(('>> currentMinute = ' + control.currentMinute).info);
-                console.log(control.dayScript[control.currentMinute]);
-            }
-
-            //  if there are any sections left then we need to process them...
-            if (control.dayScript[control.currentMinute].otherSectionsKey.length > 0) {
-                var newSearchSection = control.dayScript[control.currentMinute].otherSectionsKey.pop();
-                setTimeout(function() {
-                    control.getMinute(searchDate, newSearchSection, mode);
-                });
-            } else {
-
-                //  otherwise bump the minute and start all over again
-                control.currentMinute++;
-
-                if (control.currentMinute < 1440) {
-                    setTimeout(function() {
-                        control.getMinute(searchDate, '/', mode);
-                    });
-                } else {
-
-                    //  If we have just finished the "views" mode we need
-                    //  to do the whole thing again but with picks
-                    if (mode == 'views') {
-                        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
-                        console.log('>> moving onto picks'.alert.bold);
-                        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
-                        control.currentMinute = 0;
-                        setTimeout(function() {
-                            control.getMinute(searchDate, '/', 'picks');
-                        });
-                    } else {
-                        console.log('>> FINISHED'.info);
-                        console.log('-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'.rainbow);
-                    }
-                }
-            }
 
 
         });
 
     },
 
-    storeViews: function(views) {
+    storeViews: function(views, searchMinute, otherSectionsKey, otherSectionsDict, dayScript) {
 
         //  Now that we have them we are going to do two things
         //  throw the sections into an array so we can go and fetch those too
         var thisView = null;
         var thisTag = null;
+
         for (var i in views) {
 
             thisView = views[i];
 
             //  Build up the other sections array
-            if (!(thisView.sectionId in control.dayScript[control.currentMinute].otherSectionsDict)) {
-                control.dayScript[control.currentMinute].otherSectionsDict[thisView.sectionId] = true;
-                control.dayScript[control.currentMinute].otherSectionsKey.push(thisView.sectionId);
+            if (!(thisView.sectionId in otherSectionsDict)) {
+                otherSectionsDict[thisView.sectionId] = true;
+                otherSectionsKey.push(thisView.sectionId);
                 //console.log(('>> Found section: ' + thisView.sectionId).info);
             }
 
@@ -516,11 +579,11 @@ control = {
                 if (thisTag.split('/')[0] != thisTag.split('/')[1]) {
 
                     //  If we already have this tag then we need 
-                    if (thisTag in control.dayScript[control.currentMinute].tags) {
-                        control.dayScript[control.currentMinute].tags[thisTag].score = control.dayScript[control.currentMinute].tags[thisTag].score * 1.01;
-                        control.dayScript[control.currentMinute].tags[thisTag].age = 1; // <<< - reset the age as we have just spotted it
+                    if (thisTag in dayScript.tags) {
+                        dayScript.tags[thisTag].score = dayScript.tags[thisTag].score * 1.01;
+                        dayScript.tags[thisTag].age = 1; // <<< - reset the age as we have just spotted it
                     } else {
-                        control.dayScript[control.currentMinute].tags[thisTag] = {
+                        dayScript.tags[thisTag] = {
                             score: 1.6 - ((thisView.position+1) / 10),
                             age: 1
                         };
@@ -529,6 +592,11 @@ control = {
             }
 
         }
+
+        // TODO:
+        //  NEED TO RETURN otherSectionsKey AND otherSectionsDict SO THEY CAN BE UPDATED.
+        return {otherSectionsKey: otherSectionsKey, otherSectionsDict: otherSectionsDict, dayScript: dayScript};
+
 
     }
 

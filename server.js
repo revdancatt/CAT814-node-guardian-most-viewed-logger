@@ -70,6 +70,9 @@ if (!('MONGOHQ_URL' in process.env)) {
 var connectionUri = url.parse(process.env.MONGOHQ_URL);
 var dbName = connectionUri.pathname.replace(/^\//, '');
 
+console.log(('>> Connecting to: ' + process.env.MONGOHQ_URL).info);
+console.log(('>> dbName: ' + dbName).info);
+
 mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
 
   if(err) {
@@ -112,13 +115,7 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
       }
     });
 
-    //  REMOVE THIS, ONLY USING THIS FOR TESTING
-    var dateObj = {
-        year: 2013,
-        month: 03,
-        day: 11
-    };
-    //control.getDay(dateObj);
+    //control.startGetMinute();
 
   }
 
