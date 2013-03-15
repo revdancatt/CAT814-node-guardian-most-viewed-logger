@@ -74,7 +74,7 @@ control = {
     startTimers: function() {
 
         var msTillNextChunk = utils.msTillNextChunk();
-        console.log(('>> set next picks fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
+        console.log(('>> set next pick and views fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
 
         if (this.fetchSectionsViews.length === 0) {
             this.fetchSectionsViews = this.sections.keys.slice();
@@ -84,11 +84,32 @@ control = {
             this.fetchSectionsPicks = this.sections.keys.slice();
         }
 
-        clearTimeout(control.fetchViewsTmr);
-        clearTimeout(control.fetchPicksTmr);
+        clearInterval(control.fetchViewsTmr);
+        control.fetchViewsTmr = setTimeout( function() {
+            clearInterval(control.fetchViewsTmr);
+            console.log('>> Starting fetchViewsTmr interval timer now'.info);
+            control.fetchViewsTmr = setInterval( function() {
+                console.log(('>> called fetchViews at ' + utils.msSinceMidnight()).info);
+                control.fetchViews();
+            }, 1000 * 60 * 20);
+            console.log(('>> called fetchViews at ' + utils.msSinceMidnight()).info);
+            control.fetchViews();
+        }, msTillNextChunk + 1);
 
-        control.fetchViewsTmr = setTimeout( function() { control.fetchViews(); }, msTillNextChunk + 1);
-        control.fetchPicksTmr = setTimeout( function() { control.fetchPicks(); }, msTillNextChunk + 1);
+
+        clearInterval(control.fetchPicksTmr);
+        control.fetchPicksTmr = setTimeout( function() {
+            console.log('>> Starting fetchPicksTmr interval timer now'.info);
+            clearInterval(control.fetchPicksTmr);
+            control.fetchPicksTmr = setInterval( function() {
+                console.log(('>> called fetchPicks at ' + utils.msSinceMidnight()).info);
+                control.fetchPicks();
+            }, 1000 * 60 * 20);
+            console.log(('>> called fetchPicks at ' + utils.msSinceMidnight()).info);
+            control.fetchPicks();
+        }, msTillNextChunk + 1);
+
+
 
         //  Set up the makeScriptTmr to start half way through the next minute
         var d = new Date();
@@ -112,20 +133,11 @@ control = {
     //  go grab the data from the guardian for it
     fetchViews: function() {
 
-        //  check to see if any still exists
+        //  if there are no sections left then we are done this time round.
         if (this.fetchSectionsViews.length === 0) {
-
-            //  if not repopulate the array and set it to go again in
-            //  a short while.
-
+            //  re-populate the views
             this.fetchSectionsViews = this.sections.keys.slice();
-            var msTillNextChunk = utils.msTillNextChunk();
-
-            console.log(('>> set next view fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
-
-            clearTimeout(control.fetchViewsTmr);
-            control.fetchViewsTmr = setTimeout( function() { control.fetchViews(); }, msTillNextChunk + 1);
-
+            console.log(('>> finished fetchViews at ' + utils.msSinceMidnight).info);
             return;
         }
 
@@ -180,20 +192,11 @@ control = {
     //  go grab the data from the guardian for it
     fetchPicks: function() {
 
-        //  check to see if any still exists
+        //  check to see if any still exists, if not then we are done
         if (this.fetchSectionsPicks.length === 0) {
-
-            //  if not repopulate the array and set it to go again in
-            //  a short while.
-
+            //  re-populate the views
             this.fetchSectionsPicks = this.sections.keys.slice();
-            var msTillNextChunk = utils.msTillNextChunk();
-
-            console.log(('>> set next pick fetch to be: ' + msTillNextChunk/1000/60 + 'mins time').info);
-
-            clearTimeout(control.fetchPicksTmr);
-            control.fetchPicksTmr = setTimeout( function() { control.fetchPicks(); }, msTillNextChunk + 1);
-
+            console.log(('>> finished fetchPicks at ' + utils.msSinceMidnight).info);
             return;
         }
 
@@ -608,12 +611,19 @@ control = {
 
 utils = {
 
+    msSinceMidnight: function() {
+
+        var d = new Date();
+        var e = new Date(d);
+        var msSinceMidnight = e - d.setHours(0,0,0,0);
+
+        return msSinceMidnight;
+
+    },
+
     msTillNextChunk: function() {
 
-            var d = new Date();
-            var e = new Date(d);
-            var msSinceMidnight = e - d.setHours(0,0,0,0);
-
+            var msSinceMidnight = this.msSinceMidnight();
             var lastTimeChunk = Math.floor(msSinceMidnight / 1200000);
             var nextTimeChunk = (lastTimeChunk + 1) * 1200000;
             var msTillNextChunk = nextTimeChunk - msSinceMidnight;
