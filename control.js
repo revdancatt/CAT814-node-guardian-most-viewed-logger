@@ -166,7 +166,8 @@ control = {
                     if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'mostViewed' in json.response && json.response.mostViewed.length > 0) {
                         control.saveItems(json.response.mostViewed, section, 'views');
                     } else {
-                        console.log(('>> Didn\'t find results in response for ' + section + ', views').warn);
+                        //  Do Nowt
+                        //console.log(('>> Didn\'t find results in response for ' + section + ', views').warn);
                     }
                 } catch(er) {
                     console.log(('>> Threw an error when converting output to JSON:').warn);
@@ -227,7 +228,8 @@ control = {
                     if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'editorsPicks' in json.response && json.response.editorsPicks.length > 0) {
                         control.saveItems(json.response.editorsPicks, section, 'picks');
                     } else {
-                        console.log(('>> Didn\'t find results in response for ' + section + ', picks').warn);
+                        //  Do Nowt
+                        //console.log(('>> Didn\'t find results in response for ' + section + ', picks').warn);
                     }
                 } catch(er) {
                     console.log(('>> Threw an error when converting output to JSON:').warn);
