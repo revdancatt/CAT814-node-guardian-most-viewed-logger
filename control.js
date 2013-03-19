@@ -137,7 +137,7 @@ control = {
         if (this.fetchSectionsViews.length === 0) {
             //  re-populate the views
             this.fetchSectionsViews = this.sections.keys.slice();
-            console.log(('>> finished fetchViews at ' + utils.msSinceMidnight).info);
+            console.log(('>> finished fetchViews at ' + utils.msSinceMidnight()).info);
             return;
         }
 
@@ -159,13 +159,18 @@ control = {
             response.on('end', function() {
 
                 //  TODO: put error checking here
-                var json = JSON.parse(output);
+                try {
+                    var json = JSON.parse(output);
 
-                //  TODO: handle any of the below failing so we can just carry on
-                if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'mostViewed' in json.response && json.response.mostViewed.length > 0) {
-                    control.saveItems(json.response.mostViewed, section, 'views');
-                } else {
-                    console.log(('>> Didn\'t find results in response for ' + section + ', views').warn);
+                    //  TODO: handle any of the below failing so we can just carry on
+                    if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'mostViewed' in json.response && json.response.mostViewed.length > 0) {
+                        control.saveItems(json.response.mostViewed, section, 'views');
+                    } else {
+                        console.log(('>> Didn\'t find results in response for ' + section + ', views').warn);
+                    }
+                } catch(er) {
+                    console.log(('>> Threw an error when converting output to JSON:').warn);
+                    console.log(('>> ' + url).warn);
                 }
 
                 //  Do this again in no time at all
@@ -196,7 +201,7 @@ control = {
         if (this.fetchSectionsPicks.length === 0) {
             //  re-populate the views
             this.fetchSectionsPicks = this.sections.keys.slice();
-            console.log(('>> finished fetchPicks at ' + utils.msSinceMidnight).info);
+            console.log(('>> finished fetchPicks at ' + utils.msSinceMidnight()).info);
             return;
         }
 
@@ -217,11 +222,16 @@ control = {
 
             response.on('end', function() {
 
-                var json = JSON.parse(output);
-                if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'editorsPicks' in json.response && json.response.editorsPicks.length > 0) {
-                    control.saveItems(json.response.editorsPicks, section, 'picks');
-                } else {
-                    console.log(('>> Didn\'t find results in response for ' + section + ', picks').warn);
+                try {
+                    var json = JSON.parse(output);
+                    if ('response' in json && 'status' in json.response && json.response.status == 'ok' && 'editorsPicks' in json.response && json.response.editorsPicks.length > 0) {
+                        control.saveItems(json.response.editorsPicks, section, 'picks');
+                    } else {
+                        console.log(('>> Didn\'t find results in response for ' + section + ', picks').warn);
+                    }
+                } catch(er) {
+                    console.log(('>> Threw an error when converting output to JSON:').warn);
+                    console.log(('>> ' + url).warn);
                 }
 
                 setTimeout( function() {
