@@ -58,6 +58,7 @@ control = {
     fetchViewsTmr: null,
     fetchPicksTmr: null,
     makeScriptTmr: null,
+    cullOldRecordsTmr: null,
 
     dayScript: {},
     currentMinute: 0,
@@ -96,7 +97,6 @@ control = {
             control.fetchViews();
         }, msTillNextChunk + 1);
 
-
         clearInterval(control.fetchPicksTmr);
         control.fetchPicksTmr = setTimeout( function() {
             console.log('>> Starting fetchPicksTmr interval timer now'.info);
@@ -126,6 +126,16 @@ control = {
             }, 1000 * 60);
             control.startGetMinute();
         }, futureMs);
+
+        //  Set up cullOldRecords to run every 3 hours, which should cull the records
+        //  soon enough. We could work out how to run it at 1 hour past midnight each
+        //  day, but what the heck, this means it'll cull within 3 hours of midnight 
+        //  happening, and if something goes wrong it'll try again 8 times during the day
+        clearInterval(control.cullOldRecordsTmr);
+        control.cullOldRecordsTmr = setInterval( function() {
+            control.cullOldRecords();
+        }, 1000 * 60 * 60 * 3);
+        control.cullOldRecords();
 
     },
 
@@ -172,6 +182,8 @@ control = {
                 } catch(er) {
                     console.log(('>> Threw an error when converting output to JSON:').warn);
                     console.log(('>> ' + url).warn);
+                    console.log(er);
+                    return;
                 }
 
                 //  Do this again in no time at all
@@ -264,27 +276,9 @@ control = {
         //  First thought figure out the current time so we can stamp the
         //  record with the day/time
         var d = new Date();
-        var hourMins = d.getHours();
-        if (hourMins < 10) {
-            hourMins = '0' + hourMins;
-        }
-        if (d.getMinutes() < 10) {
-            hourMins += ':0' + d.getMinutes();
-        } else {
-            hourMins += ':' + d.getMinutes();
-        }
-
-        var searchDate = (d.getYear() + 1900) + '-';
-        if (d.getMonth() + 1 < 10) {
-            searchDate += '0' + (d.getMonth() + 1) + '-';
-        } else {
-            searchDate += (d.getMonth() + 1) + '-';
-        }
-        if (d.getDate() < 10) {
-            searchDate += '0' + d.getDate();
-        } else {
-            searchDate += d.getDate();
-        }
+        var tmpd = utils.makeSearchDate(d);
+        var searchDate = tmpd.searchDate;
+        var hourMins = tmpd.hourMins;
 
         var minsSinceMidnight = d.getHours() * 60 + d.getMinutes();
         var shortDate = null;
@@ -335,7 +329,7 @@ control = {
             //  Pop this into the database, we don't really care what happens unless there's an error
             this.viewsCollection.insert(item, {safe: true, keepGoing: true}, function(err, result) {
                 if(err) {
-                    console.log('>> Error when putting content into the viewsCollection database.'.error);
+                    console.log('>> Error when putting content into the viewsCollection database (' + item.searchSection + ').'.error);
                     console.log(err);
                 } else {
                     //console.log(('>> view record added: ' + item.id).info);
@@ -347,7 +341,7 @@ control = {
             //  Pop this into the database, we don't really care what happens unless there's an error
             this.picksCollection.insert(item, {safe: true, keepGoing: true}, function(err, result) {
                 if(err) {
-                    console.log('>> Error when putting content into the picksCollection database.'.error);
+                    console.log('>> Error when putting content into the picksCollection database (' + item.searchSection + ').'.error);
                     console.log(err);
                 } else {
                     //console.log(('>> picks record added: ' + item.id).info);
@@ -617,6 +611,98 @@ control = {
         return {otherSectionsKey: otherSectionsKey, otherSectionsDict: otherSectionsDict, dayScript: dayScript};
 
 
+    },
+
+    cullOldRecords: function() {
+
+        var d = new Date();
+        d.setHours(0,0,0,0);
+        d = new Date(d - (1000 * 60 * 60 * 24 * 8)); // <--- this will keep a weeks worth of data.
+        var searchDate = utils.makeSearchDate(d).searchDate;
+
+        console.log(('>> Culling records for ' + searchDate).info);
+
+        //  Go extract the latest minsSinceMidnight, which is most likely 1,420 but you can never tell
+        this.viewsCollection.find({searchDate: searchDate, searchSection: '/', position: 0}, {minsSinceMidnight: true}).sort({minsSinceMidnight: -1}).limit(1).toArray(function(err, records) {
+
+            //  just to make sure we don't kill anything if we rolled over a
+            //  minute, let's give ourselves a buffer. We want to kill
+            //  anything from before here...
+            var cullViewsFromMinutes = records[0].minsSinceMidnight - 10;
+            control.viewsCollection.remove({searchDate: searchDate, minsSinceMidnight: {$lt: cullViewsFromMinutes}}, {safe: true}, function(err, result) {
+                if (err) {
+                    console.log('>> FAIL when removing views Collection'.error);
+                }
+            });
+
+        });
+
+        //  Go extract the latest minsSinceMidnight, which is most likely 1,420 but you can never tell
+        this.picksCollection.find({searchDate: searchDate, searchSection: '/', position: 0}, {minsSinceMidnight: true}).sort({minsSinceMidnight: -1}).limit(1).toArray(function(err, records) {
+
+            //  just to make sure we don't kill anything if we rolled over a
+            //  minute, let's give ourselves a buffer. We want to kill
+            //  anything from before here...
+            var cullPicksFromMinutes = records[0].minsSinceMidnight - 10;
+            control.picksCollection.remove({searchDate: searchDate, minsSinceMidnight: {$lt: cullPicksFromMinutes}}, {safe: true}, function(err, result) {
+                if (err) {
+                    console.log('>> FAIL when removing picks Collection'.error);
+                }
+            });
+
+        });
+
+
+        //  and now the scripts
+        control.scriptCollection.remove({searchDate: searchDate}, {safe: true}, function(err, result) {
+            if (err) {
+                console.log('>> FAIL when removing scripts Collection'.error);
+            }
+        });
+
+    },
+
+    //  This will return a JSON object for the most viewed or most picked for
+    //  a date
+    getMostX: function(response, params, queryObject) {
+
+        returnJSON = {
+            status: 'ok',
+            err: '',
+            results: []
+        };
+
+        //  TODO: add validation here
+        var dbToUse = this.viewsCollection;
+        if (params.data == 'picks') dbToUse = this.picksCollection;
+        var year = parseInt(params.year, 10);
+        var month = parseInt(params.month, 10);
+        var day = parseInt(params.day, 10);
+        if (month < 10) month = '0' + month;
+        if (day < 10) day = '0' + day;
+
+        dbToUse.find({searchDate: year + '-' + month + '-' + day, searchSection: params.searchSection},
+            {
+                searchSection: false,
+                tagKeysShort: false,
+                tagDict: false,
+                hourMins: false,
+                minsSinceMidnight: false,
+                shortDate: false,
+                searchDate: false,
+                tagKeysFull: false,
+                _id: false
+            })
+            .sort({minsSinceMidnight: -1, position: 1}).limit(5).toArray(function(err, records)
+                {
+                    returnJSON.results = records;
+                    response.writeHead(200, {'Content-Type': 'text/html'});
+                    if ('callback' in queryObject) response.write(queryObject.callback + '(');
+                    response.write(JSON.stringify(returnJSON));
+                    if ('callback' in queryObject) response.write(')');
+                    response.end();
+                });
+
     }
 
 };
@@ -639,9 +725,40 @@ utils = {
             var lastTimeChunk = Math.floor(msSinceMidnight / 1200000);
             var nextTimeChunk = (lastTimeChunk + 1) * 1200000;
             var msTillNextChunk = nextTimeChunk - msSinceMidnight;
+            msTillNextChunk += 2000; // Add on 1 extra seconds to make sure we start in the minute
 
             return msTillNextChunk;
 
+    },
+
+    makeSearchDate: function(d) {
+
+        var hourMins = d.getHours();
+        if (hourMins < 10) {
+            hourMins = '0' + hourMins;
+        }
+        if (d.getMinutes() < 10) {
+            hourMins += ':0' + d.getMinutes();
+        } else {
+            hourMins += ':' + d.getMinutes();
+        }
+
+        var searchDate = (d.getYear() + 1900) + '-';
+        if (d.getMonth() + 1 < 10) {
+            searchDate += '0' + (d.getMonth() + 1) + '-';
+        } else {
+            searchDate += (d.getMonth() + 1) + '-';
+        }
+        if (d.getDate() < 10) {
+            searchDate += '0' + d.getDate();
+        } else {
+            searchDate += d.getDate();
+        }
+
+        return {
+            hourMins: hourMins,
+            searchDate: searchDate
+        };
     }
 };
 

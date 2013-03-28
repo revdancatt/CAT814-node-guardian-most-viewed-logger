@@ -1,3 +1,4 @@
+var url  = require('url');
 
 
 exports.index = function(request, response){
@@ -43,3 +44,29 @@ exports.getDay = function(request, response){
 
 };
 
+exports.cullOldRecords = function(request, response){
+
+    //  For the moment go and fetch the latest articles here
+    //  this will normally be on an interval
+    control.cullOldRecords();
+    response.writeHead(200, {'Content-Type': 'text/html'});
+    response.write('Culling old records<br />');
+    response.write('<p>');
+    response.write('<a href="/">Go Back</a>');
+    response.write('</p>');
+    response.end();
+
+};
+
+exports.getMostX = function(request, response){
+
+    control.getMostX(response, request.params, url.parse(request.url,true).query);
+
+};
+
+exports.getMostXGlobal = function(request, response){
+
+    request.params.searchSection = '/';
+    control.getMostX(response, request.params, url.parse(request.url,true).query);
+
+};

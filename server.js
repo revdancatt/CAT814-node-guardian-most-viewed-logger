@@ -126,6 +126,12 @@ app.get('/', routes.index);
 app.get('/fetchMostViewed', routes.fetchMostViewed);
 app.get('/getDay/:year/:month/:day?', routes.getDay);
 
+app.get('/cullOldRecords', routes.cullOldRecords);
+
+app.get('/:year/:month/:day/:data/:format?', routes.getMostXGlobal);
+app.get('/:searchSection/:year/:month/:day/:data/:format?', routes.getMostX);
+
+
 /*
 app.get('/pet/*', function(request, response) {
     console.log(request.params);
