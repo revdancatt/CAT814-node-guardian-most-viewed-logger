@@ -1,7 +1,7 @@
 {
   "name": "CAT814-node-guardian-most-viewed-logger",
   "subdomain": "revdancatt.CAT814-node-most-viewed-logger",
-  "version": "0.0.6-11",
+  "version": "0.0.6-14",
   "private": true,
   "scripts": {
     "start": "./server.js"
@@ -14,6 +14,7 @@
     "express": "3.1.0",
     "express3-handlebars": "0.3.2",
     "handlebars": "1.0.10",
-    "mongodb": "1.2.x"
+    "mongodb": "1.2.x",
+    "canvas": "1.0.x"
   }
 }

@@ -80,7 +80,7 @@ exports.storeImage = function(request, response){
     ctx.fillRect(0,0,150,150);   // Draw a rectangle with default settings
     ctx.save();                  // Save the default state
 
-    ctx.fillStyle = '#09F';       // Make changes to the settings
+    ctx.fillStyle = '#90F';       // Make changes to the settings
     ctx.fillRect(15,15,120,120); // Draw a rectangle with new settings
 
     ctx.save();                  // Save the current state
