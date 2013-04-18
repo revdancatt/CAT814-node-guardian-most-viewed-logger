@@ -131,6 +131,8 @@ app.get('/cullOldRecords', routes.cullOldRecords);
 app.get('/:year/:month/:day/:data/:format?', routes.getMostXGlobal);
 app.get('/:searchSection/:year/:month/:day/:data/:format?', routes.getMostX);
 
+app.get('/storeImage', routes.storeImage);
+app.get('/getImage', routes.getImage);
 
 /*
 app.get('/pet/*', function(request, response) {
@@ -139,4 +141,5 @@ app.get('/pet/*', function(request, response) {
 */
 
 
-http.createServer(app).listen(1337);
+http.createServer(app).listen(2222);
+console.log('>> http://localhost:2222'.alert);

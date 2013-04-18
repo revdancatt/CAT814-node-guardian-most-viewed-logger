@@ -628,12 +628,16 @@ control = {
             //  just to make sure we don't kill anything if we rolled over a
             //  minute, let's give ourselves a buffer. We want to kill
             //  anything from before here...
-            var cullViewsFromMinutes = records[0].minsSinceMidnight - 10;
-            control.viewsCollection.remove({searchDate: searchDate, minsSinceMidnight: {$lt: cullViewsFromMinutes}}, {safe: true}, function(err, result) {
-                if (err) {
-                    console.log('>> FAIL when removing views Collection'.error);
-                }
-            });
+            if (records.length > 0) {
+                var cullViewsFromMinutes = records[0].minsSinceMidnight - 10;
+                control.viewsCollection.remove({searchDate: searchDate, minsSinceMidnight: {$lt: cullViewsFromMinutes}}, {safe: true}, function(err, result) {
+                    if (err) {
+                        console.log('>> FAIL when removing views Collection'.error);
+                    }
+                });
+            } else {
+                console.log('>> No collections to find'.error);
+            }
 
         });
 
@@ -643,12 +647,16 @@ control = {
             //  just to make sure we don't kill anything if we rolled over a
             //  minute, let's give ourselves a buffer. We want to kill
             //  anything from before here...
-            var cullPicksFromMinutes = records[0].minsSinceMidnight - 10;
-            control.picksCollection.remove({searchDate: searchDate, minsSinceMidnight: {$lt: cullPicksFromMinutes}}, {safe: true}, function(err, result) {
-                if (err) {
-                    console.log('>> FAIL when removing picks Collection'.error);
-                }
-            });
+            if (records.length > 0) {
+                var cullPicksFromMinutes = records[0].minsSinceMidnight - 10;
+                control.picksCollection.remove({searchDate: searchDate, minsSinceMidnight: {$lt: cullPicksFromMinutes}}, {safe: true}, function(err, result) {
+                    if (err) {
+                        console.log('>> FAIL when removing picks Collection'.error);
+                    }
+                });
+            } else {
+                console.log('>> No picks to find'.error);
+            }
 
         });
 
