@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+    <head>
+    <title>Pool</title>
+    <link rel="stylesheet" media="all" href="css/main.css?v=0.1">
+</head>
+<body>
+
+   <ol start="0">
+   {{#each items}}
+    <li><small><a href="{{json.webUrl}}">{{json.webPublicationDate}}</a></small> - <a href="/pool/{{position}}">{{json.webTitle}}</a></li>
+   {{/each}}
+    </ol>
+
+</body>
+</html>

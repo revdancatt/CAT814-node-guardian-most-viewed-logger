@@ -115,6 +115,24 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
       }
     });
 
+    mdb.collection('images', function(err, collection) {
+      if (!err) {
+        control.imageCollection = collection;
+      } else {
+        console.log('Error connecting to images collection'.error);
+        process.exit(0);
+      }
+    });
+
+    mdb.collection('pool', function(err, collection) {
+      if (!err) {
+        control.poolCollection = collection;
+      } else {
+        console.log('Error connecting to pool collection'.error);
+        process.exit(0);
+      }
+    });
+
     control.startTimers();
 
   }
@@ -123,9 +141,13 @@ mongodb.Db.connect(process.env.MONGOHQ_URL, function(err, mdb) {
 
 
 app.get('/', routes.index);
+app.get('/map', routes.map);
+app.get('/storyMap', routes.storyMap);
+
 app.get('/fetchMostViewed', routes.fetchMostViewed);
 app.get('/getDay/:year/:month/:day?', routes.getDay);
 
+app.get('/showScript/:year/:month/:day/:format?', routes.showScript);
 app.get('/cullOldRecords', routes.cullOldRecords);
 
 app.get('/:year/:month/:day/:data/:format?', routes.getMostXGlobal);
@@ -134,11 +156,14 @@ app.get('/:searchSection/:year/:month/:day/:data/:format?', routes.getMostX);
 app.get('/storeImage', routes.storeImage);
 app.get('/getImage', routes.getImage);
 
-/*
-app.get('/pet/*', function(request, response) {
-    console.log(request.params);
-});
-*/
+app.get('/fillPool', routes.fillPool);
+app.get('/pool', routes.pool);
+app.get('/pool/all', routes.poolAll);
+app.get('/pool/:position', routes.poolItem);
+
+//  NOTE: AT SOME POINT WE WILL HAVE POST METHODS
+app.post('/api/:method?', routes.api.parsePost);
+app.get('/api/:method?', routes.api.parseGet);
 
 
 http.createServer(app).listen(2222);

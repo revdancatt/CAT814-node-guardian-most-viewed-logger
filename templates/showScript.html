@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+    <head>
+    <title>Show Script</title>
+    <link rel="stylesheet" media="all" href="/css/main.css?v=0.1">
+</head>
+<body>
+
+    <div class="searchMinute"></div>
+    
+    <canvas id="flow" width="1440" height="400"></canvas>
+
+    <script src="/js/jquery-2.0.0.min.js"></script> 
+    <script src="/js/control.js?v=0.0.1"></script>
+    <script>
+        var _SEARCHDATE = '{{searchDate}}';
+        $(document).ready(function() {
+            control.init();
+        })
+    </script>    
+    
+
+</body>
+</html>

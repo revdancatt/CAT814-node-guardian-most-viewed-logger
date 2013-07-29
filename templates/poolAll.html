@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+    <head>
+    <title>Pool</title>
+    <link rel="stylesheet" media="all" href="/css/main.css?v=0.1">
+</head>
+<body>
+
+    {{#each items}}
+        <h1>{{ json.fields.headline }}</h1>
+        <img src="{{ json.mediaAssets.file}}" />
+        <div class="body">
+            <strong>{{{ json.fields.standfirst }}}<br />By {{{ json.fields.byline }}}</strong>
+            {{{ json.fields.body }}}
+        </div>
+        <hr />
+   {{/each}}
+
+
+</body>
+</html>

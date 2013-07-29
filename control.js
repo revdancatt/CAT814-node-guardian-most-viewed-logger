@@ -54,11 +54,14 @@ control = {
     viewsCollection: null,
     picksCollection: null,
     scriptCollection: null,
+    imageCollection: null,
+    poolCollection: null,
 
     fetchViewsTmr: null,
     fetchPicksTmr: null,
     makeScriptTmr: null,
     cullOldRecordsTmr: null,
+    fillPoolTmr: null,
 
     dayScript: {},
     currentMinute: 0,
@@ -136,6 +139,16 @@ control = {
             control.cullOldRecords();
         }, 1000 * 60 * 60 * 3);
         control.cullOldRecords();
+
+        //  Refill the pool every 3 hours or so too, starting 45mins after the cullOldRecords.
+        clearInterval(control.fillPoolTmr);
+        setTimeout(function() {
+            console.log(('>> starting fillPoolTmr interval timer').info);
+            control.fillPoolTmr = setInterval( function() {
+                control.fillPool();
+            }, 1000 * 60 * 60 * 3);
+        }, 1000*60*45);
+
 
     },
 
@@ -711,7 +724,391 @@ control = {
                     response.end();
                 });
 
+    },
+
+    //  ####################################################################################
+    //  ####################################################################################
+    //  ####################################################################################
+    //
+    //  Populate the pool and work out what's the best stuff
+    //
+    //  ####################################################################################
+    //  ####################################################################################
+    //  ####################################################################################
+
+    emptyPool: function() {
+
+        console.log('>> In emptyPool'.info);
+        control.poolCollection.drop();
+
+    },
+
+    fillPool: function() {
+
+
+        //  And clear the fetchThese array, we are going to
+        //  fill this up with the things we want to check.
+        var tmpPool = {
+            keys: [],
+            urls: {}
+        };
+
+        //  Ok, now we want to start filling the pool, to do that we'll
+        //  take a number of steps, one after the other
+        //  First we need to work out what time of day it is
+        var timeOfDay = 'morning';
+        console.log('>>in fillPool()'.info);
+
+        this.fillPoolWithPicks('picks', tmpPool, timeOfDay, 6, 6, ['technology', 'lifeandstyle', 'business', 'culture', 'science', '/'], 0);
+
+    },
+
+    fillPoolWithPicks: function(mode, tmpPool, timeOfDay, initialDaysAgo, daysAgo, sectionArray, sectionPointer) {
+
+        //  pick the right collection
+        var thisCollection = control.picksCollection;
+        if (mode == 'views') {
+            thisCollection = control.viewsCollection;
+        }
+
+        //  Work out the day we should be looking for.
+        //  find the most recent Picks record we have for today
+        var searchDate = utils.makeSearchDate(new Date(new Date() - (1000*60*60*24*daysAgo))).searchDate;
+        var section = sectionArray[sectionPointer];
+
+        //  Do a sort and limit(1) so we can get the highest value for minsSinceMidnight
+        thisCollection.find({searchDate: searchDate, searchSection: section}).sort({minsSinceMidnight: -1}).limit(1).toArray(function(err, records) {
+
+            //  TODO: put error checking in here
+            var result = records[0];
+            var minsSinceMidnight = result.minsSinceMidnight;
+
+            //  Now the actual search, give and take a few minutes for what we want
+            thisCollection.find({searchDate: searchDate, searchSection: section, minsSinceMidnight: {"$gt": minsSinceMidnight - 5, "$lt": minsSinceMidnight + 5 }}).sort({position: 1}).toArray(function(err, records) {
+
+                //  loop through all the records
+                for (var r in records) {
+
+                    //  double check the date, trying to take into account the possible rollover in time at midnight
+                    if (records[r].shortDate == searchDate || records[r].webPublicationDate.split('T')[1].split(':')[0] == 23) {
+
+                        //  if this isn't the global section, only take things in position 0
+                        if (!(section != '/' && records[r].position > 0)) {
+                            //  if we already have this url then we update the record, otherwise we add it
+                            if (records[r].apiUrl in tmpPool.urls) {
+
+                                //  note that we've just seen this *another* time.
+                                tmpPool.urls[records[r].apiUrl].count++;
+
+                                //  If it's moved into a higher position use the higher one.
+                                if (records[r].position < tmpPool.urls[records[r].apiUrl].position) {
+                                    tmpPool.urls[records[r].apiUrl].position = records[r].position;
+                                }
+
+                            } else {
+
+                                //  Record the count and position
+                                tmpPool.urls[records[r].apiUrl] = {
+                                    count: 1,
+                                    position: records[r].position
+                                };
+                                //  push the key
+                                tmpPool.keys.push(records[r].apiUrl);
+
+                            }
+                        }
+                    }
+                }
+
+                //  reduce the daysAgo so we can check the next day
+                daysAgo--;
+
+                //  if the days ago hasn't gone into negative numbers
+                //  then we need to go through this all over again
+                if (daysAgo >= 0) {
+                    control.fillPoolWithPicks(mode, tmpPool, timeOfDay, initialDaysAgo, daysAgo, sectionArray, sectionPointer);
+                } else {
+
+                    //  lets move the sectionsPointer up one
+                    sectionPointer++;
+
+                    //  if we haven't gone off the end of the sections array, lets go back to the first day
+                    //  and the next item in the sections array
+                    if (sectionPointer < sectionArray.length) {
+                        daysAgo = initialDaysAgo;
+                        control.fillPoolWithPicks(mode, tmpPool, timeOfDay, initialDaysAgo, daysAgo, sectionArray, sectionPointer);
+                    } else {
+
+                        //  Oh no, we've run out of sections, now if we are in 'picks' mode we start
+                        //  back at the begining
+
+                        //  we have finished the current collection maybe we need to move onto the next one
+                        if (mode == 'picks') {
+                            mode = 'views';
+                            sectionPointer = 0;
+                            daysAgo = initialDaysAgo;
+                            control.fillPoolWithPicks(mode, tmpPool, timeOfDay, initialDaysAgo, daysAgo, sectionArray, sectionPointer);
+                            return;
+                        }
+
+                        //  if we are in 'views' mode then we are done and we can move onto
+                        //  parsing the urls to check them
+                        if (mode == 'views') {
+                            control.fetchUrls(tmpPool);
+                        }
+                    }
+
+                }
+
+            });
+
+        });
+
+    },
+
+    cleanPool: function() {
+
+        console.log('>> Now cleaning pool'.info);
+
+    },
+
+
+    fetchUrls: function(tmpPool) {
+
+
+        //  if there's nothing left to get move onto the next function in the
+        //  chain. Bit of an odd way to do it, but there you go
+        if (tmpPool.keys.length === 0) {
+            control.cullPool(tmpPool);
+            return;
+        }
+
+        //  grab the apiUrl by popping it off the keys array
+        var apiUrl = tmpPool.keys.pop();
+        var rawUrl = apiUrl;
+        apiUrl += '?format=json&show-tags=keyword&show-fields=publication,wordcount&api-key=' + this.guardian.key;
+
+        //  Go fetch it
+        //  Go and fetch the results
+        http.get(apiUrl, function(response) {
+
+            var output = '';
+
+            response.on('data', function(chunk) {
+                output += chunk;
+            });
+
+            response.on('end', function() {
+
+                //  TODO: put error checking here
+                try {
+                    var json = JSON.parse(output);
+                    var isValid = false;
+
+                    //  TODO: handle any of the below failing so we can just carry on
+                    if ('response' in json && 'status' in json.response && json.response.status == 'ok') {
+                        //  Check to see if we have the fields, and if so check the wordcount and the publication
+
+                        if ('content' in json.response && 'fields' in json.response.content) {
+
+                            //  Check the wordcount
+                            if ('wordcount' in json.response.content.fields && parseInt(json.response.content.fields.wordcount, 10) > 900) {
+
+                                //  We have the words
+                                isValid = true;
+
+                            }
+
+                        }
+
+                    } else {
+                        //  Do Nowt
+                        console.log(('>> Didn\'t find a matching result').warn);
+                    }
+
+                    //  if it's not valid then we need to remove it from the
+                    //  urls
+                    if (!isValid) {
+                        delete tmpPool.urls[rawUrl];
+                    }
+
+                } catch(er) {
+                    console.log(('>> Threw an error when converting output to JSON:').warn);
+                    console.log(('>> ' + apiUrl).warn);
+                    console.log(er);
+                    return;
+                }
+
+                //  AGAIN! AGAIN!
+                setTimeout(function() {
+                    control.fetchUrls(tmpPool);
+                }, 200);
+
+            });
+
+        }).on('error', function(e) {
+            //  TODO: Make sure this doesn't stop everything from ticking over.
+            console.log("Got error: " + e.message);
+
+            //  AGAIN! AGAIN!
+            setTimeout(function() {
+                control.fetchUrls(tmpPool);
+            }, 200);
+
+        });
+
+    },
+
+    //  Now pick out 10 items from the pool
+    cullPool: function(tmpPool) {
+
+        var newPool = {
+            keys: [],
+            urls: {}
+        };
+
+        //  do the most count thingy
+        for (var key in tmpPool.urls) {
+            if (tmpPool.urls[key].count >= 4 && newPool.keys.length < 16) {
+                newPool.keys.push(key);
+                newPool.urls[key] = tmpPool.urls[key];
+            }
+        }
+        //  remove them from the tmpPool
+        for (var i in newPool.keys) {
+            delete tmpPool.urls[newPool.keys[i]];
+        }
+
+        //  again for count == 3
+        for (key in tmpPool.urls) {
+            if (tmpPool.urls[key].count >= 3 && newPool.keys.length < 16) {
+                newPool.keys.push(key);
+                newPool.urls[key] = tmpPool.urls[key];
+            }
+        }
+        //  remove them from the tmpPool
+        for (i in newPool.keys) {
+            delete tmpPool.urls[newPool.keys[i]];
+        }
+
+        //  and for count == 2
+        for (key in tmpPool.urls) {
+            if (tmpPool.urls[key].count >= 2 && newPool.keys.length < 16) {
+                newPool.keys.push(key);
+                newPool.urls[key] = tmpPool.urls[key];
+            }
+        }
+        //  remove them from the tmpPool
+        for (i in newPool.keys) {
+            delete tmpPool.urls[newPool.keys[i]];
+        }
+
+        //  and for position == 0
+        for (key in tmpPool.urls) {
+            if (tmpPool.urls[key].position === 0 && newPool.keys.length < 16) {
+                newPool.keys.push(key);
+                newPool.urls[key] = tmpPool.urls[key];
+            }
+        }
+        //  remove them from the tmpPool
+        for (i in newPool.keys) {
+            delete tmpPool.urls[newPool.keys[i]];
+        }
+
+        //  empty the pool, hopefully this will complete before
+        //  we start the next part.
+        control.poolCollection.drop();
+        control.fetchFullContentAndPutIntoDatabase(newPool);
+
+    },
+
+    fetchFullContentAndPutIntoDatabase: function(newPool) {
+
+        //  if we have run out of urls then we are done.
+        if (newPool.keys.length === 0) {
+            console.log('>>out fillPool()'.info);
+            return;
+        }
+
+
+        //  get the last URL and therefor the position of it, we are
+        //  going to get *all* the information from the content API and pop it
+        //  into the pool database
+        var apiUrl = newPool.keys.pop();
+        var position = newPool.keys.length;
+        var rawUrl = apiUrl;
+        apiUrl += '?format=json&show-tags=all&show-fields=all&show-media=picture&api-key=' + this.guardian.key;
+
+
+        //  Go fetch it
+        //  Go and fetch the results
+        http.get(apiUrl, function(response) {
+
+            var output = '';
+
+            response.on('data', function(chunk) {
+                output += chunk;
+            });
+
+            response.on('end', function() {
+
+                //  TODO: put error checking here
+                try {
+                    var json = JSON.parse(output);
+                    var isValid = false;
+
+                    //  TODO: handle any of the below failing so we can just carry on
+                    if ('response' in json && 'status' in json.response && json.response.status == 'ok') {
+                        //  Check to see if we have the fields, and if so check the wordcount and the publication
+
+                        var newRecord = {
+                            position: position,
+                            json: json.response.content
+                        };
+
+                        //  Pop it into the database...
+                        control.poolCollection.insert(newRecord, {safe: true, keepGoing: true}, function(err, result) {
+                            //  and now load up this function again...
+                            setTimeout(function() {
+                                control.fetchFullContentAndPutIntoDatabase(newPool);
+                            }, 500);
+                        });
+
+
+                    } else {
+                        //  Do Nowt
+                        console.log(('>> Didn\'t find a matching result in fetchFullContentAndPutIntoDatabase').warn);
+                        setTimeout(function() {
+                            control.fetchFullContentAndPutIntoDatabase(newPool);
+                        }, 500);
+                    }
+
+                } catch(er) {
+                    console.log(('>> Threw an error when converting output to JSON in fetchFullContentAndPutIntoDatabase:').warn);
+                    console.log(('>> ' + apiUrl).warn);
+                    console.log(er);
+                    setTimeout(function() {
+                        control.fetchFullContentAndPutIntoDatabase(newPool);
+                    }, 500);
+                    return;
+                }
+
+            });
+
+        }).on('error', function(e) {
+            //  TODO: Make sure this doesn't stop everything from ticking over.
+            console.log("Got error in fetchFullContentAndPutIntoDatabase: " + e.message);
+
+            //  AGAIN! AGAIN!
+            setTimeout(function() {
+                control.fetchFullContentAndPutIntoDatabase(newPool);
+            }, 200);
+
+        });
+
+
     }
+
 
 };
 
